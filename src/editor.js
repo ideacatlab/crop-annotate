@@ -1,12 +1,12 @@
 /**
- * PixelEdit JS - Advanced Image Editor
+ * Crop & Annotate - Image Cropping and Annotation Library
  * Robust, framework-agnostic, and feature-rich.
  */
 
 import CanvasManager from './canvas.js';
 import ToolManager from './tools.js';
 
-export default class PixelEdit {
+export default class CropAnnotate {
     constructor(container, options = {}) {
         this.container = typeof container === 'string' ? document.querySelector(container) : container;
         this.options = {

@@ -1,0 +1,16 @@
+# Development files
+demo/
+.git/
+.gitignore
+.idea/
+.claude/
+*.log
+
+# Config files
+rollup.config.js
+.npmignore
+
+# Editor files
+*.swp
+*.swo
+.vscode/

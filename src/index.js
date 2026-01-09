@@ -1,8 +1,8 @@
-import PixelEdit from './editor.js';
+import CropAnnotate from './editor.js';
 
-export default PixelEdit;
+export default CropAnnotate;
 
 // For browser usage without modules
 if (typeof window !== 'undefined') {
-    window.PixelEdit = PixelEdit;
+    window.CropAnnotate = CropAnnotate;
 }

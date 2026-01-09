@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PixelEdit JS - Advanced Demo</title>
+    <title>Crop & Annotate - Demo</title>
     <style>
         :root { --primary: #007bff; --bg: #f8f9fa; --panel: #ffffff; }
         body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #333; }
@@ -28,7 +28,7 @@
 <body>
     <div class="app-container">
         <div class="header">
-            <h2 style="margin:0">PixelEdit JS <span style="font-weight:normal; font-size: 14px; color: #888;">v2.0</span></h2>
+            <h2 style="margin:0">Crop & Annotate <span style="font-weight:normal; font-size: 14px; color: #888;">v1.0</span></h2>
             <div style="display:flex; gap: 10px;">
                 <label class="button upload-btn" style="padding: 8px 15px; border-radius: 6px; cursor: pointer;">
                     Upload Image <input type="file" id="image-upload" accept="image/*">
@@ -74,12 +74,12 @@
         </div>
     </div>
 
-    <script src="pixel-edit.bundle.js"></script>
+    <script src="crop-annotate.bundle.js"></script>
     <script>
         const container = document.getElementById('editor-container');
         const uploadInput = document.getElementById('image-upload');
-        
-        const editor = new PixelEdit(container, {
+
+        const editor = new CropAnnotate(container, {
             strokeColor: '#ff3b30',
             strokeWidth: 4,
             fontSize: 24
@@ -132,7 +132,7 @@
         window.downloadImage = () => {
             const dataUrl = editor.export();
             const link = document.createElement('a');
-            link.download = 'pixel-edit-export.png';
+            link.download = 'crop-annotate-export.png';
             link.href = dataUrl;
             link.click();
         };

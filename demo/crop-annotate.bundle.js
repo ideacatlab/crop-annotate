@@ -1,4 +1,14 @@
 /**
+ * Crop & Annotate - Image Cropping and Annotation Library
+ * Robust, framework-agnostic, and feature-rich.
+ */
+(function (global, factory) {
+    typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
+    typeof define === 'function' && define.amd ? define(factory) :
+    (global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.CropAnnotate = factory());
+})(this, (function () { 'use strict';
+
+/**
  * CanvasManager - Handles rendering and low-level interactions.
  */
 class CanvasManager {
@@ -134,7 +144,7 @@ class CanvasManager {
         ctx.strokeStyle = '#007bff';
         ctx.lineWidth = 1;
         ctx.setLineDash([5, 5]);
-        
+
         let padding = 5;
         if (obj.type === 'pencil') {
             const bounds = this.getPencilBounds(obj);
@@ -180,24 +190,22 @@ class CanvasManager {
     drawCropOverlay(obj) {
         const { ctx } = this;
         ctx.save();
-        
+
         const nx = obj.w < 0 ? obj.x + obj.w : obj.x;
         const ny = obj.h < 0 ? obj.y + obj.h : obj.y;
         const nw = Math.abs(obj.w);
         const nh = Math.abs(obj.h);
-        
-        // Just draw a clean dashed border for selection
+
         ctx.strokeStyle = 'white';
         ctx.lineWidth = 2;
         ctx.setLineDash([5, 5]);
         ctx.strokeRect(nx, ny, nw, nh);
-        
-        // Add a second dashed line in black for visibility on light backgrounds
+
         ctx.strokeStyle = 'black';
         ctx.setLineDash([5, 5]);
         ctx.lineDashOffset = 5;
         ctx.strokeRect(nx, ny, nw, nh);
-        
+
         ctx.restore();
     }
 
@@ -232,7 +240,7 @@ class CanvasManager {
         tempCanvas.width = this.canvas.width;
         tempCanvas.height = this.canvas.height;
         const tempCtx = tempCanvas.getContext('2d');
-        
+
         tempCtx.save();
         if (direction === 'horizontal') {
             tempCtx.scale(-1, 1);
@@ -253,6 +261,7 @@ class CanvasManager {
         newImg.src = tempCanvas.toDataURL();
     }
 }
+
 /**
  * ToolManager - Manages tools, object selection, and manipulation.
  */
@@ -276,8 +285,7 @@ class ToolManager {
                 if (clickedObj.type === 'pencil') {
                     this.dragOffset.points = clickedObj.points.map(p => ({ x: pos.x - p.x, y: pos.y - p.y }));
                 }
-                
-                // Double click for text editing
+
                 if (clickedObj.type === 'text' && e.detail === 2) {
                     this.startInlineTextEdit(clickedObj);
                 }
@@ -312,7 +320,6 @@ class ToolManager {
         if (currentTool === 'select' && this.isDragging && selectedObject) {
             if (selectedObject.type === 'pencil') {
                 selectedObject.points = this.dragOffset.points.map(offset => ({ x: pos.x - offset.x, y: pos.y - offset.y }));
-                // Update base x,y for selection box
                 const bounds = this.editor.canvasManager.getPencilBounds(selectedObject);
                 selectedObject.x = bounds.x; selectedObject.y = bounds.y;
             } else {
@@ -390,12 +397,11 @@ class ToolManager {
         const y = obj.h < 0 ? obj.y + obj.h : obj.y;
         const w = Math.abs(obj.w);
         const h = Math.abs(obj.h);
-        
+
         if (obj.type === 'arrow') {
-            // Simple distance to line check
             return this.distToSegment(pos, {x: obj.x, y: obj.y}, {x: obj.x + obj.w, y: obj.y + obj.h}) < padding;
         }
-        
+
         return pos.x >= x - padding && pos.x <= x + w + padding && pos.y >= y - padding && pos.y <= y + h + padding;
     }
 
@@ -410,11 +416,11 @@ class ToolManager {
     createNewText(pos) {
         const input = document.createElement('input');
         input.type = 'text';
-        input.style.position = 'fixed'; // Use fixed to avoid scroll issues
-        
+        input.style.position = 'fixed';
+
         const rect = this.editor.canvasManager.canvas.getBoundingClientRect();
         const scale = rect.width / this.editor.canvasManager.canvas.width;
-        
+
         input.style.left = (rect.left + pos.x * scale) + 'px';
         input.style.top = (rect.top + pos.y * scale - (this.editor.options.fontSize * scale)) + 'px';
         input.style.font = `${this.editor.options.fontSize * scale}px ${this.editor.options.fontFamily}`;
@@ -425,7 +431,7 @@ class ToolManager {
         input.style.padding = '2px';
         input.style.margin = '0';
         input.style.zIndex = '10000';
-        
+
         document.body.appendChild(input);
         setTimeout(() => input.focus(), 10);
 
@@ -450,7 +456,7 @@ class ToolManager {
         };
 
         input.onblur = finish;
-        input.onkeydown = (e) => { 
+        input.onkeydown = (e) => {
             if (e.key === 'Enter') finish();
             if (e.key === 'Escape') { finished = true; document.body.removeChild(input); this.editor.state.isDrawing = false; }
         };
@@ -461,10 +467,10 @@ class ToolManager {
         input.type = 'text';
         input.value = obj.text;
         input.style.position = 'fixed';
-        
+
         const rect = this.editor.canvasManager.canvas.getBoundingClientRect();
         const scale = rect.width / this.editor.canvasManager.canvas.width;
-        
+
         input.style.left = (rect.left + obj.x * scale) + 'px';
         input.style.top = (rect.top + obj.y * scale - (obj.fontSize * scale)) + 'px';
         input.style.font = `${obj.fontSize * scale}px ${this.editor.options.fontFamily}`;
@@ -473,16 +479,16 @@ class ToolManager {
         input.style.background = 'rgba(255,255,255,0.8)';
         input.style.outline = 'none';
         input.style.zIndex = '10000';
-        
+
         document.body.appendChild(input);
         setTimeout(() => {
             input.focus();
             input.select();
         }, 10);
-        
+
         this.editor.state.isEditingText = true;
         const originalText = obj.text;
-        obj.text = ''; // Hide original text while editing
+        obj.text = '';
         this.editor.canvasManager.render();
 
         let finished = false;
@@ -497,21 +503,18 @@ class ToolManager {
         };
 
         input.onblur = finish;
-        input.onkeydown = (e) => { 
+        input.onkeydown = (e) => {
             if (e.key === 'Enter') finish();
             if (e.key === 'Escape') { finished = true; obj.text = originalText; document.body.removeChild(input); this.editor.state.isEditingText = false; this.editor.canvasManager.render(); }
         };
     }
 }
+
 /**
- * PixelEdit JS - Advanced Image Editor
+ * Crop & Annotate - Image Cropping and Annotation Library
  * Robust, framework-agnostic, and feature-rich.
  */
-
-
-
-
-class PixelEdit {
+class CropAnnotate {
     constructor(container, options = {}) {
         this.container = typeof container === 'string' ? document.querySelector(container) : container;
         this.options = {
@@ -584,14 +587,13 @@ class PixelEdit {
     }
 
     saveHistory() {
-        // Deep copy objects and image state
         const snapshot = {
             objects: JSON.parse(JSON.stringify(this.state.objects)),
             imageSrc: this.state.image ? this.state.image.src : null,
             canvasWidth: this.canvasManager.canvas.width,
             canvasHeight: this.canvasManager.canvas.height
         };
-        
+
         this.state.history = this.state.history.slice(0, this.state.historyIndex + 1);
         this.state.history.push(snapshot);
         this.state.historyIndex++;
@@ -607,7 +609,7 @@ class PixelEdit {
     restoreFromHistory() {
         const state = this.state.history[this.state.historyIndex];
         this.state.objects = JSON.parse(JSON.stringify(state.objects));
-        
+
         if (state.imageSrc) {
             const img = new Image();
             img.onload = () => {
@@ -631,4 +633,7 @@ class PixelEdit {
         return this.canvasManager.canvas.toDataURL('image/png');
     }
 }
-window.PixelEdit = PixelEdit;
+
+return CropAnnotate;
+
+}));
