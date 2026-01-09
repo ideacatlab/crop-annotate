@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PixelEdit JS - Advanced Demo</title>
+    <style>
+        :root { --primary: #007bff; --bg: #f8f9fa; --panel: #ffffff; }
+        body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #333; }
+        .app-container { max-width: 1200px; margin: 0 auto; background: var(--panel); border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); overflow: hidden; display: flex; flex-direction: column; height: 90vh; }
+        .header { padding: 15px 25px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .toolbar { padding: 10px 20px; background: #f1f3f5; border-bottom: 1px solid #eee; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .tool-group { display: flex; gap: 4px; padding-right: 12px; border-right: 1px solid #ddd; margin-right: 8px; }
+        .tool-group:last-child { border-right: none; }
+        button { padding: 8px 14px; border: 1px solid #ccc; border-radius: 6px; background: white; cursor: pointer; font-size: 14px; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
+        button:hover { background: #f8f9fa; border-color: #999; }
+        button.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .color-picker { width: 34px; height: 34px; padding: 0; border: 2px solid white; border-radius: 50%; cursor: pointer; box-shadow: 0 0 0 1px #ccc; }
+        #editor-viewport { flex: 1; overflow: auto; display: flex; justify-content: center; align-items: flex-start; padding: 40px; background: #e9ecef; position: relative; }
+        #editor-container { background: white; box-shadow: 0 5px 15px rgba(0,0,0,0.1); position: relative; }
+        .instructions { font-size: 12px; color: #666; padding: 10px 25px; background: #fff; border-top: 1px solid #eee; }
+        input[type="file"] { display: none; }
+        .upload-btn { background: #6c757d; color: white; border: none; }
+        .download-btn { background: #28a745; color: white; border: none; }
+        .undo-btn { background: #ffc107; color: #333; border: none; }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="header">
+            <h2 style="margin:0">PixelEdit JS <span style="font-weight:normal; font-size: 14px; color: #888;">v2.0</span></h2>
+            <div style="display:flex; gap: 10px;">
+                <label class="button upload-btn" style="padding: 8px 15px; border-radius: 6px; cursor: pointer;">
+                    Upload Image <input type="file" id="image-upload" accept="image/*">
+                </label>
+                <button onclick="downloadImage()" class="download-btn">Download Result</button>
+            </div>
+        </div>
+
+        <div class="toolbar">
+            <div class="tool-group">
+                <button onclick="setTool('select')" id="btn-select" class="active">Select / Move</button>
+                <button onclick="setTool('crop')" id="btn-crop">Crop Tool</button>
+            </div>
+            <div class="tool-group">
+                <button onclick="setTool('pencil')" id="btn-pencil">Pencil</button>
+                <button onclick="setTool('arrow')" id="btn-arrow">Arrow</button>
+                <button onclick="setTool('rect')" id="btn-rect">Rectangle</button>
+                <button onclick="setTool('circle')" id="btn-circle">Circle</button>
+                <button onclick="setTool('text')" id="btn-text">Text</button>
+                <button onclick="setTool('highlight')" id="btn-highlight">Highlight</button>
+            </div>
+            <div class="tool-group">
+                <input type="color" id="color-picker" class="color-picker" value="#ff3b30" onchange="setColor(this.value)">
+                <button onclick="editor.flip('horizontal')">Flip H</button>
+                <button onclick="editor.flip('vertical')">Flip V</button>
+            </div>
+            <div class="tool-group">
+                <button onclick="editor.undo()" class="undo-btn">Undo</button>
+            </div>
+        </div>
+
+        <div id="editor-viewport">
+            <div id="editor-container">
+                <div style="padding: 100px; color: #999; text-align: center;">
+                    <p>Upload an image to start editing</p>
+                    <p style="font-size: 12px;">Supports: Crop, Annotate, Move, Edit Text, Undo</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <b>Tips:</b> [Select] to move objects or double-click text to edit. [Delete/Backspace] to remove selected object. [Crop] drag to select area, release to crop.
+        </div>
+    </div>
+
+    <script src="pixel-edit.bundle.js"></script>
+    <script>
+        const container = document.getElementById('editor-container');
+        const uploadInput = document.getElementById('image-upload');
+        
+        const editor = new PixelEdit(container, {
+            strokeColor: '#ff3b30',
+            strokeWidth: 4,
+            fontSize: 24
+        });
+        window.editor = editor;
+
+        const handleFile = (file) => {
+            if (file && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const placeholder = container.querySelector('div');
+                    if (placeholder) placeholder.style.display = 'none';
+                    editor.loadImage(event.target.result).catch(err => {
+                        console.error('Upload error:', err);
+                        alert('Error loading image. Please try another file.');
+                    });
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+
+        uploadInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+
+        // Drag and Drop support
+        const viewport = document.getElementById('editor-viewport');
+        viewport.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            viewport.style.background = '#dee2e6';
+        });
+        viewport.addEventListener('dragleave', () => {
+            viewport.style.background = '#e9ecef';
+        });
+        viewport.addEventListener('drop', (e) => {
+            e.preventDefault();
+            viewport.style.background = '#e9ecef';
+            handleFile(e.dataTransfer.files[0]);
+        });
+
+        window.setTool = (tool) => {
+            editor.setTool(tool);
+            document.querySelectorAll('.toolbar button').forEach(btn => btn.classList.remove('active'));
+            const activeBtn = document.getElementById(`btn-${tool}`);
+            if (activeBtn) activeBtn.classList.add('active');
+        };
+
+        window.setColor = (color) => {
+            editor.setColor(color);
+        };
+
+        window.downloadImage = () => {
+            const dataUrl = editor.export();
+            const link = document.createElement('a');
+            link.download = 'pixel-edit-export.png';
+            link.href = dataUrl;
+            link.click();
+        };
+    </script>
+</body>
+</html>

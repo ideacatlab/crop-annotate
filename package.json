@@ -1,0 +1,20 @@
+{
+  "name": "crop-annotate",
+  "version": "1.0.0",
+  "description": "A robust, framework-agnostic image cropping and annotation library.",
+  "main": "dist/pixel-edit.js",
+  "module": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "image",
+    "editor",
+    "crop",
+    "annotate",
+    "canvas",
+    "vanilla-js"
+  ],
+  "author": "Manus",
+  "license": "MIT"
+}
