@@ -21,7 +21,7 @@ export default class ToolManager {
                 if (clickedObj.type === 'pencil') {
                     this.dragOffset.points = clickedObj.points.map(p => ({ x: pos.x - p.x, y: pos.y - p.y }));
                 }
-                
+
                 // Double click for text editing
                 if (clickedObj.type === 'text' && e.detail === 2) {
                     this.startInlineTextEdit(clickedObj);
@@ -72,6 +72,28 @@ export default class ToolManager {
 
         if (activeObject.type === 'pencil') {
             activeObject.points.push({ x: pos.x, y: pos.y });
+        } else if (activeObject.type === 'crop' && this.editor.state.cropAspectRatio) {
+            // Apply aspect ratio constraint for crop tool
+            const ratio = this.editor.state.cropAspectRatio;
+            const targetRatio = ratio.width / ratio.height;
+
+            let w = pos.x - this.startPos.x;
+            let h = pos.y - this.startPos.y;
+
+            // Determine which dimension to constrain based on drag direction
+            const absW = Math.abs(w);
+            const absH = Math.abs(h);
+
+            if (absW / targetRatio > absH) {
+                // Width is dominant, constrain height
+                h = (absW / targetRatio) * Math.sign(h || 1);
+            } else {
+                // Height is dominant, constrain width
+                w = (absH * targetRatio) * Math.sign(w || 1);
+            }
+
+            activeObject.w = w;
+            activeObject.h = h;
         } else {
             activeObject.w = pos.x - this.startPos.x;
             activeObject.h = pos.y - this.startPos.y;
@@ -127,20 +149,20 @@ export default class ToolManager {
             return obj.points.some(p => Math.hypot(p.x - pos.x, p.y - pos.y) < padding);
         }
         if (obj.type === 'text') {
-            const metrics = this.editor.canvasManager.ctx.measureText(obj.text);
-            const h = obj.fontSize || 24;
-            return pos.x >= obj.x && pos.x <= obj.x + metrics.width && pos.y >= obj.y - h && pos.y <= obj.y;
+            const bounds = this.editor.canvasManager.getTextBounds(obj);
+            return pos.x >= bounds.x - padding && pos.x <= bounds.x + bounds.width + padding &&
+                   pos.y >= bounds.y - padding && pos.y <= bounds.y + bounds.height + padding;
         }
         const x = obj.w < 0 ? obj.x + obj.w : obj.x;
         const y = obj.h < 0 ? obj.y + obj.h : obj.y;
         const w = Math.abs(obj.w);
         const h = Math.abs(obj.h);
-        
+
         if (obj.type === 'arrow') {
             // Simple distance to line check
             return this.distToSegment(pos, {x: obj.x, y: obj.y}, {x: obj.x + obj.w, y: obj.y + obj.h}) < padding;
         }
-        
+
         return pos.x >= x - padding && pos.x <= x + w + padding && pos.y >= y - padding && pos.y <= y + h + padding;
     }
 
@@ -153,78 +175,113 @@ export default class ToolManager {
     }
 
     createNewText(pos) {
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.style.position = 'fixed'; // Use fixed to avoid scroll issues
-        
+        const textarea = document.createElement('textarea');
+        textarea.style.position = 'fixed';
+        textarea.style.resize = 'none';
+        textarea.style.overflow = 'hidden';
+
         const rect = this.editor.canvasManager.canvas.getBoundingClientRect();
         const scale = rect.width / this.editor.canvasManager.canvas.width;
-        
-        input.style.left = (rect.left + pos.x * scale) + 'px';
-        input.style.top = (rect.top + pos.y * scale - (this.editor.options.fontSize * scale)) + 'px';
-        input.style.font = `${this.editor.options.fontSize * scale}px ${this.editor.options.fontFamily}`;
-        input.style.color = this.editor.state.currentColor;
-        input.style.border = '1px dashed #007bff';
-        input.style.background = 'rgba(255,255,255,0.5)';
-        input.style.outline = 'none';
-        input.style.padding = '2px';
-        input.style.margin = '0';
-        input.style.zIndex = '10000';
-        
-        document.body.appendChild(input);
-        setTimeout(() => input.focus(), 10);
+        const fontSize = this.editor.options.fontSize * scale;
+
+        textarea.style.left = (rect.left + pos.x * scale) + 'px';
+        textarea.style.top = (rect.top + pos.y * scale - fontSize) + 'px';
+        textarea.style.font = `${fontSize}px ${this.editor.options.fontFamily}`;
+        textarea.style.color = this.editor.state.currentColor;
+        textarea.style.border = '1px dashed #007bff';
+        textarea.style.background = 'rgba(255,255,255,0.8)';
+        textarea.style.outline = 'none';
+        textarea.style.padding = '2px';
+        textarea.style.margin = '0';
+        textarea.style.zIndex = '10000';
+        textarea.style.minWidth = '100px';
+        textarea.style.minHeight = fontSize + 'px';
+        textarea.style.lineHeight = '1.2';
+        textarea.rows = 1;
+
+        document.body.appendChild(textarea);
+        setTimeout(() => textarea.focus(), 10);
+
+        // Auto-resize textarea as user types
+        const autoResize = () => {
+            textarea.style.height = 'auto';
+            textarea.style.height = textarea.scrollHeight + 'px';
+        };
+        textarea.addEventListener('input', autoResize);
 
         let finished = false;
         const finish = () => {
             if (finished) return;
             finished = true;
-            if (input.value.trim()) {
+            if (textarea.value.trim()) {
                 this.editor.state.objects.push({
                     type: 'text',
                     x: pos.x,
                     y: pos.y,
-                    text: input.value,
+                    text: textarea.value,
                     color: this.editor.state.currentColor,
                     fontSize: this.editor.options.fontSize
                 });
                 this.editor.saveHistory();
                 this.editor.canvasManager.render();
             }
-            if (input.parentNode) document.body.removeChild(input);
+            if (textarea.parentNode) document.body.removeChild(textarea);
             this.editor.state.isDrawing = false;
         };
 
-        input.onblur = finish;
-        input.onkeydown = (e) => { 
-            if (e.key === 'Enter') finish();
-            if (e.key === 'Escape') { finished = true; document.body.removeChild(input); this.editor.state.isDrawing = false; }
+        textarea.onblur = finish;
+        textarea.onkeydown = (e) => {
+            // Enter without Shift finishes, Shift+Enter adds new line
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                finish();
+            }
+            if (e.key === 'Escape') {
+                finished = true;
+                document.body.removeChild(textarea);
+                this.editor.state.isDrawing = false;
+            }
         };
     }
 
     startInlineTextEdit(obj) {
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.value = obj.text;
-        input.style.position = 'fixed';
-        
+        const textarea = document.createElement('textarea');
+        textarea.value = obj.text;
+        textarea.style.position = 'fixed';
+        textarea.style.resize = 'none';
+        textarea.style.overflow = 'hidden';
+
         const rect = this.editor.canvasManager.canvas.getBoundingClientRect();
         const scale = rect.width / this.editor.canvasManager.canvas.width;
-        
-        input.style.left = (rect.left + obj.x * scale) + 'px';
-        input.style.top = (rect.top + obj.y * scale - (obj.fontSize * scale)) + 'px';
-        input.style.font = `${obj.fontSize * scale}px ${this.editor.options.fontFamily}`;
-        input.style.color = obj.color;
-        input.style.border = '1px dashed #007bff';
-        input.style.background = 'rgba(255,255,255,0.8)';
-        input.style.outline = 'none';
-        input.style.zIndex = '10000';
-        
-        document.body.appendChild(input);
+        const fontSize = obj.fontSize * scale;
+
+        textarea.style.left = (rect.left + obj.x * scale) + 'px';
+        textarea.style.top = (rect.top + obj.y * scale - fontSize) + 'px';
+        textarea.style.font = `${fontSize}px ${this.editor.options.fontFamily}`;
+        textarea.style.color = obj.color;
+        textarea.style.border = '1px dashed #007bff';
+        textarea.style.background = 'rgba(255,255,255,0.8)';
+        textarea.style.outline = 'none';
+        textarea.style.padding = '2px';
+        textarea.style.zIndex = '10000';
+        textarea.style.minWidth = '100px';
+        textarea.style.lineHeight = '1.2';
+
+        document.body.appendChild(textarea);
+
+        // Auto-resize to fit content
+        const autoResize = () => {
+            textarea.style.height = 'auto';
+            textarea.style.height = textarea.scrollHeight + 'px';
+        };
+        textarea.addEventListener('input', autoResize);
+
         setTimeout(() => {
-            input.focus();
-            input.select();
+            textarea.focus();
+            textarea.select();
+            autoResize();
         }, 10);
-        
+
         this.editor.state.isEditingText = true;
         const originalText = obj.text;
         obj.text = ''; // Hide original text while editing
@@ -234,17 +291,27 @@ export default class ToolManager {
         const finish = () => {
             if (finished) return;
             finished = true;
-            obj.text = input.value.trim() || originalText;
-            if (input.value !== originalText) this.editor.saveHistory();
-            if (input.parentNode) document.body.removeChild(input);
+            obj.text = textarea.value.trim() || originalText;
+            if (textarea.value !== originalText) this.editor.saveHistory();
+            if (textarea.parentNode) document.body.removeChild(textarea);
             this.editor.state.isEditingText = false;
             this.editor.canvasManager.render();
         };
 
-        input.onblur = finish;
-        input.onkeydown = (e) => { 
-            if (e.key === 'Enter') finish();
-            if (e.key === 'Escape') { finished = true; obj.text = originalText; document.body.removeChild(input); this.editor.state.isEditingText = false; this.editor.canvasManager.render(); }
+        textarea.onblur = finish;
+        textarea.onkeydown = (e) => {
+            // Enter without Shift finishes, Shift+Enter adds new line
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                finish();
+            }
+            if (e.key === 'Escape') {
+                finished = true;
+                obj.text = originalText;
+                document.body.removeChild(textarea);
+                this.editor.state.isEditingText = false;
+                this.editor.canvasManager.render();
+            }
         };
     }
 }

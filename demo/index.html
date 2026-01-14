@@ -3,88 +3,389 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crop & Annotate - Demo</title>
+    <title>Crop & Annotate - Image Editor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#6366f1',
+                        secondary: '#8b5cf6'
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        :root { --primary: #007bff; --bg: #f8f9fa; --panel: #ffffff; }
-        body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #333; }
-        .app-container { max-width: 1200px; margin: 0 auto; background: var(--panel); border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); overflow: hidden; display: flex; flex-direction: column; height: 90vh; }
-        .header { padding: 15px 25px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-        .toolbar { padding: 10px 20px; background: #f1f3f5; border-bottom: 1px solid #eee; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-        .tool-group { display: flex; gap: 4px; padding-right: 12px; border-right: 1px solid #ddd; margin-right: 8px; }
-        .tool-group:last-child { border-right: none; }
-        button { padding: 8px 14px; border: 1px solid #ccc; border-radius: 6px; background: white; cursor: pointer; font-size: 14px; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
-        button:hover { background: #f8f9fa; border-color: #999; }
-        button.active { background: var(--primary); color: white; border-color: var(--primary); }
-        .color-picker { width: 34px; height: 34px; padding: 0; border: 2px solid white; border-radius: 50%; cursor: pointer; box-shadow: 0 0 0 1px #ccc; }
-        #editor-viewport { flex: 1; overflow: auto; display: flex; justify-content: center; align-items: flex-start; padding: 40px; background: #e9ecef; position: relative; }
-        #editor-container { background: white; box-shadow: 0 5px 15px rgba(0,0,0,0.1); position: relative; }
-        .instructions { font-size: 12px; color: #666; padding: 10px 25px; background: #fff; border-top: 1px solid #eee; }
-        input[type="file"] { display: none; }
-        .upload-btn { background: #6c757d; color: white; border: none; }
-        .download-btn { background: #28a745; color: white; border: none; }
-        .undo-btn { background: #ffc107; color: #333; border: none; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+        .tool-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            color: #64748b;
+            transition: all 0.15s;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+        }
+        .tool-btn:hover { background: #f1f5f9; color: #475569; }
+        .tool-btn.active { background: #6366f1; color: white; }
+        .tool-btn svg { width: 18px; height: 18px; }
+        .divider { width: 1px; height: 24px; background: #e2e8f0; margin: 0 8px; }
+        .color-swatch {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: transform 0.1s;
+            border: 2px solid transparent;
+        }
+        .color-swatch:hover { transform: scale(1.15); }
+        .color-swatch.active { border-color: #6366f1; }
+        .panel-section { border-bottom: 1px solid #e2e8f0; }
+        .panel-section:last-child { border-bottom: none; }
     </style>
 </head>
-<body>
-    <div class="app-container">
-        <div class="header">
-            <h2 style="margin:0">Crop & Annotate <span style="font-weight:normal; font-size: 14px; color: #888;">v1.0</span></h2>
-            <div style="display:flex; gap: 10px;">
-                <label class="button upload-btn" style="padding: 8px 15px; border-radius: 6px; cursor: pointer;">
-                    Upload Image <input type="file" id="image-upload" accept="image/*">
-                </label>
-                <button onclick="downloadImage()" class="download-btn">Download Result</button>
+<body class="bg-slate-100 h-screen flex flex-col overflow-hidden">
+    <!-- Header -->
+    <header class="bg-white border-b border-slate-200 px-4 h-14 flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center">
+                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-sm font-semibold text-slate-800">Crop & Annotate</h1>
+                <p class="text-[10px] text-slate-400">v1.2</p>
             </div>
         </div>
 
-        <div class="toolbar">
-            <div class="tool-group">
-                <button onclick="setTool('select')" id="btn-select" class="active">Select / Move</button>
-                <button onclick="setTool('crop')" id="btn-crop">Crop Tool</button>
+        <!-- Center: File actions -->
+        <div class="flex items-center gap-2">
+            <label class="flex items-center gap-2 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                </svg>
+                <span>Open</span>
+                <input type="file" id="image-upload" accept="image/*" class="hidden">
+            </label>
+            <button onclick="downloadImage()" class="flex items-center gap-2 px-3 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+                <span>Save Original</span>
+            </button>
+        </div>
+
+        <!-- Right: Info -->
+        <div class="flex items-center gap-4 text-xs text-slate-400">
+            <span id="image-dimensions">No image</span>
+            <a href="https://github.com/ideacatlab/crop-annotate" target="_blank" class="flex items-center gap-1 hover:text-slate-600 transition-colors">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                </svg>
+                <span>GitHub</span>
+            </a>
+        </div>
+    </header>
+
+    <!-- Toolbar -->
+    <div class="bg-white border-b border-slate-200 px-4 h-12 flex items-center flex-shrink-0">
+        <div class="flex items-center">
+            <!-- Selection tools -->
+            <button onclick="setTool('select')" id="btn-select" class="tool-btn active" title="Select (V)">
+                <svg viewBox="0 0 32 32" fill="currentColor">
+                    <path d="M 13 2 C 11.355469 2 10 3.355469 10 5 L 10 15.75 L 9.25 15.5625 C 9.09375 15.359375 9.027344 15.230469 8.625 14.9375 C 7.984375 14.46875 6.992188 14 5.65625 14 C 4.230469 14 3 15.289063 3 16.90625 L 3 17.3125 L 3.28125 17.625 L 10 24.40625 L 10 30 L 26 30 L 26 13.15625 C 26 11.746094 25.003906 10.515625 23.625 10.21875 L 16 8.5625 L 16 5 C 16 3.355469 14.644531 2 13 2 Z M 13 4 C 13.566406 4 14 4.433594 14 5 L 14 10.1875 L 14.78125 10.375 L 23.21875 12.15625 C 23.6875 12.257813 24 12.679688 24 13.15625 L 24 23 L 11.40625 23 L 5.09375 16.59375 C 5.175781 16.171875 5.347656 16 5.65625 16 C 6.558594 16 7.117188 16.273438 7.46875 16.53125 C 7.820313 16.789063 7.90625 16.96875 7.90625 16.96875 L 8.09375 17.3125 L 8.5 17.4375 L 10.75 18.03125 L 12 18.34375 L 12 5 C 12 4.433594 12.433594 4 13 4 Z M 12 25 L 24 25 L 24 28 L 12 28 Z"/>
+                </svg>
+            </button>
+            <button onclick="setTool('crop')" id="btn-crop" class="tool-btn" title="Crop (C)">
+                <svg viewBox="0 0 24 24" fill="none">
+                    <path d="M6 3V14.8C6 15.9201 6 16.4802 6.21799 16.908C6.40973 17.2843 6.71569 17.5903 7.09202 17.782C7.51984 18 8.0799 18 9.2 18H15M21 18H18M18 21V9.2C18 8.0799 18 7.51984 17.782 7.09202C17.5903 6.71569 17.2843 6.40973 16.908 6.21799C16.4802 6 15.9201 6 14.8 6H9M3 6H6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+
+            <div class="divider"></div>
+
+            <!-- Drawing tools -->
+            <button onclick="setTool('pencil')" id="btn-pencil" class="tool-btn" title="Pencil (P)">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                </svg>
+            </button>
+            <button onclick="setTool('arrow')" id="btn-arrow" class="tool-btn" title="Arrow (A)">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+                </svg>
+            </button>
+            <button onclick="setTool('rect')" id="btn-rect" class="tool-btn" title="Rectangle (R)">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <rect x="4" y="4" width="16" height="16" rx="2" stroke-width="2" fill="none"/>
+                </svg>
+            </button>
+            <button onclick="setTool('circle')" id="btn-circle" class="tool-btn" title="Circle (O)">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="8" stroke-width="2"/>
+                </svg>
+            </button>
+            <button onclick="setTool('text')" id="btn-text" class="tool-btn" title="Text (T) - Shift+Enter for new line">
+                <svg viewBox="0 0 24 24" fill="none">
+                    <path d="M12 3V21M9 21H15M19 6V3H5V6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+            <button onclick="setTool('highlight')" id="btn-highlight" class="tool-btn" title="Highlight (H)">
+                <svg viewBox="0 0 24 24" fill="none">
+                    <path d="M13 3H8.2C7.0799 3 6.51984 3 6.09202 3.21799C5.71569 3.40973 5.40973 3.71569 5.21799 4.09202C5 4.51984 5 5.0799 5 6.2V17.8C5 18.9201 5 19.4802 5.21799 19.908C5.40973 20.2843 5.71569 20.5903 6.09202 20.782C6.51984 21 7.0799 21 8.2 21H12M13 3L19 9M13 3V7.4C13 7.96005 13 8.24008 13.109 8.45399C13.2049 8.64215 13.3578 8.79513 13.546 8.89101C13.7599 9 14.0399 9 14.6 9H19M19 9V10M9 17H12M9 13H12M9 9H10M16 14H21V21L18.5 19.611L16 21V14Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+
+            <div class="divider"></div>
+
+            <!-- Color picker -->
+            <div class="flex items-center gap-1.5 px-1">
+                <input type="color" id="color-picker" value="#ff3b30" onchange="setColor(this.value)" class="w-7 h-7 rounded cursor-pointer border-0 p-0">
+                <button onclick="setColor('#ef4444')" class="color-swatch bg-red-500" data-color="#ef4444"></button>
+                <button onclick="setColor('#f97316')" class="color-swatch bg-orange-500" data-color="#f97316"></button>
+                <button onclick="setColor('#eab308')" class="color-swatch bg-yellow-500" data-color="#eab308"></button>
+                <button onclick="setColor('#22c55e')" class="color-swatch bg-green-500" data-color="#22c55e"></button>
+                <button onclick="setColor('#3b82f6')" class="color-swatch bg-blue-500" data-color="#3b82f6"></button>
+                <button onclick="setColor('#8b5cf6')" class="color-swatch bg-violet-500" data-color="#8b5cf6"></button>
+                <button onclick="setColor('#000000')" class="color-swatch bg-black" data-color="#000000"></button>
             </div>
-            <div class="tool-group">
-                <button onclick="setTool('pencil')" id="btn-pencil">Pencil</button>
-                <button onclick="setTool('arrow')" id="btn-arrow">Arrow</button>
-                <button onclick="setTool('rect')" id="btn-rect">Rectangle</button>
-                <button onclick="setTool('circle')" id="btn-circle">Circle</button>
-                <button onclick="setTool('text')" id="btn-text">Text</button>
-                <button onclick="setTool('highlight')" id="btn-highlight">Highlight</button>
-            </div>
-            <div class="tool-group">
-                <input type="color" id="color-picker" class="color-picker" value="#ff3b30" onchange="setColor(this.value)">
-                <button onclick="editor.flip('horizontal')">Flip H</button>
-                <button onclick="editor.flip('vertical')">Flip V</button>
-            </div>
-            <div class="tool-group">
-                <button onclick="editor.undo()" class="undo-btn">Undo</button>
+
+            <div class="divider"></div>
+
+            <!-- Transform tools -->
+            <button onclick="editor.flip('horizontal')" class="tool-btn" title="Flip Horizontal">
+                <svg viewBox="0 0 24 24" fill="none">
+                    <path d="M3 12H6M18 12H21M12 3V6M12 18V21M7 21L7 3M17 3V21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+            <button onclick="editor.flip('vertical')" class="tool-btn" title="Flip Vertical">
+                <svg viewBox="0 0 24 24" fill="none">
+                    <path d="M12 3V6M12 18V21M3 12H6M18 12H21M3 7H21M3 17H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+            <button onclick="editor.rotate('left')" class="tool-btn" title="Rotate Left 90">
+                <svg viewBox="0 0 1920 1920" fill="currentColor">
+                    <path fill-rule="evenodd" clip-rule="evenodd" d="M1251.45 447.883 1120 316.432h160c176.73 0 320 143.269 320 320h106.67c0-235.641-191.03-426.666-426.67-426.666h-159.97l134.34-134.341L1178.94 0 915.833 263.111l260.197 260.196 75.42-75.424Zm28.55 405.45C1280 735.513 1184.49 640 1066.67 640H213.333C95.513 640 0 735.513 0 853.333v853.337C0 1824.49 95.513 1920 213.333 1920h853.337c117.82 0 213.33-95.51 213.33-213.33V853.333Zm-213.33-106.666H213.333c-58.91 0-106.666 47.756-106.666 106.666v853.337c0 58.91 47.756 106.66 106.666 106.66h853.337c58.91 0 106.66-47.75 106.66-106.66V853.333c0-58.91-47.75-106.666-106.66-106.666Z"/>
+                </svg>
+            </button>
+            <button onclick="editor.rotate('right')" class="tool-btn" title="Rotate Right 90">
+                <svg viewBox="200 0 1720 1920" fill="currentColor">
+                    <path fill-rule="evenodd" clip-rule="evenodd" d="M639.999 209.777h116.019L621.665 75.425 697.09 0l263.111 263.111-260.196 260.196-75.425-75.424 131.439-131.439h-116.02c-176.731 0-320 143.269-320 320H213.332c0-235.642 191.025-426.667 426.667-426.667Zm0 643.556c0-117.82 95.512-213.333 213.333-213.333h853.338c117.82 0 213.33 95.513 213.33 213.333v853.337c0 117.82-95.51 213.33-213.33 213.33H853.332c-117.821 0-213.333-95.51-213.333-213.33V853.333Zm213.333-106.666h853.338c58.91 0 106.66 47.756 106.66 106.666v853.337c0 58.91-47.75 106.66-106.66 106.66H853.332c-58.91 0-106.667-47.75-106.667-106.66V853.333c0-58.91 47.757-106.666 106.667-106.666Z"/>
+                </svg>
+            </button>
+
+            <div class="divider"></div>
+
+            <!-- History -->
+            <button onclick="editor.undo()" class="tool-btn" title="Undo (Ctrl+Z)">
+                <svg viewBox="0 0 24 24" fill="none">
+                    <path d="M4 9H13C16.866 9 20 12.134 20 16V17M4 9L8 5M4 9L8 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+            <button onclick="editor.redo()" class="tool-btn" title="Redo (Ctrl+Y)">
+                <svg viewBox="0 0 24 24" fill="none">
+                    <path d="M20 9H11C7.13401 9 4 12.134 4 16V17M20 9L16 5M20 9L16 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+
+            <div class="divider"></div>
+
+            <!-- Aspect ratio -->
+            <div class="flex items-center gap-2">
+                <span class="text-xs text-slate-400">Ratio:</span>
+                <select id="aspect-ratio" onchange="setAspectRatio(this.value)" class="text-xs border border-slate-200 rounded px-2 py-1 bg-white text-slate-600 focus:outline-none focus:ring-1 focus:ring-primary">
+                    <option value="free">Free</option>
+                    <option value="1:1">1:1</option>
+                    <option value="16:9">16:9</option>
+                    <option value="9:16">9:16</option>
+                    <option value="4:3">4:3</option>
+                    <option value="3:2">3:2</option>
+                </select>
             </div>
         </div>
 
-        <div id="editor-viewport">
-            <div id="editor-container">
-                <div style="padding: 100px; color: #999; text-align: center;">
-                    <p>Upload an image to start editing</p>
-                    <p style="font-size: 12px;">Supports: Crop, Annotate, Move, Edit Text, Undo</p>
-                </div>
+        <!-- Right side: Zoom controls -->
+        <div class="ml-auto flex items-center gap-3">
+            <div class="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                <button onclick="editor.zoomOut()" class="w-7 h-7 flex items-center justify-center rounded hover:bg-slate-200 text-slate-600" title="Zoom Out">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/>
+                    </svg>
+                </button>
+                <span id="zoom-level" class="text-xs font-medium text-slate-600 w-12 text-center">100%</span>
+                <button onclick="editor.zoomIn()" class="w-7 h-7 flex items-center justify-center rounded hover:bg-slate-200 text-slate-600" title="Zoom In">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                </button>
             </div>
-        </div>
-
-        <div class="instructions">
-            <b>Tips:</b> [Select] to move objects or double-click text to edit. [Delete/Backspace] to remove selected object. [Crop] drag to select area, release to crop.
+            <button onclick="editor.zoomToFit()" class="text-xs px-2 py-1 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded" title="Fit to View">Fit</button>
+            <button onclick="editor.resetZoom()" class="text-xs px-2 py-1 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded" title="100%">1:1</button>
         </div>
     </div>
+
+    <!-- Main Content Area -->
+    <div class="flex-1 flex overflow-hidden">
+        <!-- Canvas Area -->
+        <main class="flex-1 overflow-auto bg-slate-200 relative" id="editor-viewport">
+            <div class="absolute inset-0 flex items-center justify-center p-8">
+                <div id="editor-container" class="bg-white shadow-xl rounded-lg overflow-hidden">
+                    <div class="p-20 text-center">
+                        <div class="w-16 h-16 mx-auto mb-4 bg-slate-100 rounded-2xl flex items-center justify-center">
+                            <svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                        </div>
+                        <p class="text-slate-400 text-sm mb-1">Drop image here or click Open</p>
+                        <p class="text-slate-300 text-xs">JPG, PNG, WebP, GIF</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Right Panel: Translations -->
+        <aside id="translations-panel" class="w-80 bg-white border-l border-slate-200 flex-shrink-0 flex flex-col overflow-hidden">
+            <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+                <h2 class="text-sm font-semibold text-slate-700">Text & Translations</h2>
+                <button onclick="refreshTextAnnotations()" class="text-xs text-primary hover:text-primary/80" title="Refresh">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto">
+                <!-- Text Annotations Section -->
+                <div class="panel-section p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-xs font-medium text-slate-500 uppercase tracking-wide">Text Annotations</h3>
+                        <div class="flex items-center gap-2">
+                            <span id="text-count" class="text-xs text-slate-400">0 items</span>
+                            <button onclick="downloadTextJson()" class="text-xs text-primary hover:text-primary/80 flex items-center gap-1" title="Download JSON">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                </svg>
+                                JSON
+                            </button>
+                        </div>
+                    </div>
+                    <div id="text-annotations-list" class="space-y-2">
+                        <p class="text-xs text-slate-400 italic">No text annotations yet. Use the Text tool to add text.</p>
+                    </div>
+                </div>
+
+                <!-- Add Translation Section -->
+                <div class="panel-section p-4">
+                    <h3 class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Add Translation</h3>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="text-xs text-slate-500 mb-1 block">Language Code</label>
+                            <div class="flex gap-2">
+                                <select id="lang-code-select" class="flex-1 text-sm border border-slate-200 rounded px-2 py-1.5 bg-white text-slate-600 focus:outline-none focus:ring-1 focus:ring-primary">
+                                    <option value="es">Spanish (es)</option>
+                                    <option value="fr">French (fr)</option>
+                                    <option value="de">German (de)</option>
+                                    <option value="it">Italian (it)</option>
+                                    <option value="pt">Portuguese (pt)</option>
+                                    <option value="zh">Chinese (zh)</option>
+                                    <option value="ja">Japanese (ja)</option>
+                                    <option value="ko">Korean (ko)</option>
+                                    <option value="ru">Russian (ru)</option>
+                                    <option value="ar">Arabic (ar)</option>
+                                    <option value="custom">Custom...</option>
+                                </select>
+                                <input type="text" id="lang-code-custom" placeholder="code" class="w-16 text-sm border border-slate-200 rounded px-2 py-1.5 hidden focus:outline-none focus:ring-1 focus:ring-primary">
+                            </div>
+                        </div>
+                        <button onclick="startTranslation()" class="w-full py-2 text-sm bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors">
+                            Start Translation
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Translation Editor Section (hidden by default) -->
+                <div id="translation-editor" class="panel-section p-4 hidden">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-xs font-medium text-slate-500 uppercase tracking-wide">
+                            Translating to: <span id="current-lang" class="text-primary"></span>
+                        </h3>
+                        <button onclick="cancelTranslation()" class="text-xs text-red-500 hover:text-red-600">Cancel</button>
+                    </div>
+                    <div id="translation-fields" class="space-y-3">
+                        <!-- Translation inputs will be dynamically added here -->
+                    </div>
+                    <button onclick="saveTranslation()" class="w-full mt-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+                        Save Translation
+                    </button>
+                </div>
+
+                <!-- Saved Translations Section -->
+                <div class="panel-section p-4">
+                    <h3 class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Saved Translations</h3>
+                    <div id="saved-translations" class="space-y-2">
+                        <p class="text-xs text-slate-400 italic">No translations saved yet.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Export Options -->
+            <div class="p-4 border-t border-slate-200 bg-slate-50">
+                <h3 class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Export Options</h3>
+                <div id="export-buttons" class="space-y-2">
+                    <button onclick="downloadImage()" class="w-full py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                        Download Original
+                    </button>
+                    <!-- Translation download buttons will be added dynamically -->
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 px-4 h-10 flex items-center justify-between flex-shrink-0">
+        <div class="text-xs text-slate-400">
+            <span class="text-slate-500 font-medium">Tip:</span> Ctrl+Scroll to zoom | Shift+Enter for new line in text | Delete to remove
+        </div>
+        <div class="flex items-center gap-6">
+            <a href="https://turbocat.ro" target="_blank" class="flex items-center gap-2 text-xs text-slate-400 hover:text-primary transition-colors">
+                <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
+                <span>Need development services? <strong class="text-primary">turbocat.ro</strong></span>
+            </a>
+        </div>
+    </footer>
 
     <script src="crop-annotate.bundle.js"></script>
     <script>
         const container = document.getElementById('editor-container');
         const uploadInput = document.getElementById('image-upload');
+        const zoomLevelDisplay = document.getElementById('zoom-level');
+        const imageDimensions = document.getElementById('image-dimensions');
 
         const editor = new CropAnnotate(container, {
-            strokeColor: '#ff3b30',
+            strokeColor: '#ef4444',
             strokeWidth: 4,
             fontSize: 24
         });
         window.editor = editor;
+
+        // Current translation being edited
+        let currentTranslationLang = null;
+
+        editor.onZoomChange = (level) => {
+            zoomLevelDisplay.textContent = Math.round(level * 100) + '%';
+        };
 
         const handleFile = (file) => {
             if (file && file.type.startsWith('image/')) {
@@ -92,9 +393,14 @@
                 reader.onload = (event) => {
                     const placeholder = container.querySelector('div');
                     if (placeholder) placeholder.style.display = 'none';
-                    editor.loadImage(event.target.result).catch(err => {
+                    editor.loadImage(event.target.result).then(() => {
+                        const size = editor.getImageSize();
+                        imageDimensions.textContent = `${size.width} x ${size.height}`;
+                        zoomLevelDisplay.textContent = Math.round(editor.getZoom() * 100) + '%';
+                        refreshTextAnnotations();
+                    }).catch(err => {
                         console.error('Upload error:', err);
-                        alert('Error loading image. Please try another file.');
+                        alert('Error loading image.');
                     });
                 };
                 reader.readAsDataURL(file);
@@ -103,39 +409,302 @@
 
         uploadInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
 
-        // Drag and Drop support
         const viewport = document.getElementById('editor-viewport');
-        viewport.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            viewport.style.background = '#dee2e6';
-        });
-        viewport.addEventListener('dragleave', () => {
-            viewport.style.background = '#e9ecef';
-        });
-        viewport.addEventListener('drop', (e) => {
-            e.preventDefault();
-            viewport.style.background = '#e9ecef';
-            handleFile(e.dataTransfer.files[0]);
-        });
+        viewport.addEventListener('dragover', (e) => { e.preventDefault(); viewport.classList.add('bg-primary/10'); });
+        viewport.addEventListener('dragleave', () => viewport.classList.remove('bg-primary/10'));
+        viewport.addEventListener('drop', (e) => { e.preventDefault(); viewport.classList.remove('bg-primary/10'); handleFile(e.dataTransfer.files[0]); });
 
         window.setTool = (tool) => {
             editor.setTool(tool);
-            document.querySelectorAll('.toolbar button').forEach(btn => btn.classList.remove('active'));
-            const activeBtn = document.getElementById(`btn-${tool}`);
-            if (activeBtn) activeBtn.classList.add('active');
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+            const btn = document.getElementById(`btn-${tool}`);
+            if (btn) btn.classList.add('active');
         };
 
         window.setColor = (color) => {
             editor.setColor(color);
+            document.getElementById('color-picker').value = color;
+            document.querySelectorAll('.color-swatch').forEach(s => {
+                s.classList.toggle('active', s.dataset.color === color);
+            });
+        };
+
+        window.setAspectRatio = (ratio) => {
+            editor.setCropAspectRatio(ratio);
+            if (ratio !== 'free') setTool('crop');
         };
 
         window.downloadImage = () => {
-            const dataUrl = editor.export();
             const link = document.createElement('a');
-            link.download = 'crop-annotate-export.png';
+            link.download = 'image.png';
+            link.href = editor.export();
+            link.click();
+        };
+
+        // ========== TEXT ANNOTATIONS & TRANSLATIONS ==========
+
+        window.refreshTextAnnotations = () => {
+            const annotations = editor.getTextAnnotations();
+            const listEl = document.getElementById('text-annotations-list');
+            const countEl = document.getElementById('text-count');
+
+            countEl.textContent = `${annotations.length} item${annotations.length !== 1 ? 's' : ''}`;
+
+            if (annotations.length === 0) {
+                listEl.innerHTML = '<p class="text-xs text-slate-400 italic">No text annotations yet. Use the Text tool to add text.</p>';
+                return;
+            }
+
+            listEl.innerHTML = annotations.map(ann => {
+                const lineCount = ann.text.split('\n').length;
+                const hasNewlines = lineCount > 1;
+                return `
+                <div class="bg-slate-50 rounded-lg p-2 text-xs">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="flex-1 min-w-0">
+                            <p class="text-slate-700 font-medium" title="${escapeHtml(ann.text)}">${escapeHtml(ann.text.split('\n')[0])}${hasNewlines ? `<span class="text-primary/60 ml-1">+${lineCount - 1} lines</span>` : ''}</p>
+                            <p class="text-slate-400 mt-0.5 text-[10px] font-mono">${ann.id}</p>
+                        </div>
+                        <span class="w-3 h-3 rounded-full flex-shrink-0" style="background: ${ann.color}"></span>
+                    </div>
+                </div>
+            `}).join('');
+
+            // Update saved translations list
+            updateSavedTranslationsList();
+        };
+
+        window.escapeHtml = (text) => {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        };
+
+        window.downloadTextJson = () => {
+            const annotations = editor.getTextAnnotations();
+            if (annotations.length === 0) {
+                alert('No text annotations to export.');
+                return;
+            }
+
+            const json = JSON.stringify(annotations, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+
+            const link = document.createElement('a');
+            link.download = 'text-annotations.json';
+            link.href = url;
+            link.click();
+
+            URL.revokeObjectURL(url);
+        };
+
+        // Language code select handler
+        document.getElementById('lang-code-select').addEventListener('change', (e) => {
+            const customInput = document.getElementById('lang-code-custom');
+            if (e.target.value === 'custom') {
+                customInput.classList.remove('hidden');
+                customInput.focus();
+            } else {
+                customInput.classList.add('hidden');
+            }
+        });
+
+        // Helper to format text with visible newlines
+        window.formatTextWithNewlines = (text) => {
+            // Replace newlines with visible indicator and actual break
+            return escapeHtml(text).replace(/\n/g, '<span class="text-primary/60"> ↵</span><br>');
+        };
+
+        window.startTranslation = () => {
+            const annotations = editor.getTextAnnotations();
+            if (annotations.length === 0) {
+                alert('No text annotations to translate. Add some text first.');
+                return;
+            }
+
+            const select = document.getElementById('lang-code-select');
+            const customInput = document.getElementById('lang-code-custom');
+            const langCode = select.value === 'custom' ? customInput.value.trim() : select.value;
+
+            if (!langCode) {
+                alert('Please enter a language code.');
+                return;
+            }
+
+            currentTranslationLang = langCode;
+            document.getElementById('current-lang').textContent = langCode.toUpperCase();
+
+            // Build translation form
+            const fieldsEl = document.getElementById('translation-fields');
+            const existingTranslations = editor.getTranslations(langCode) || {};
+
+            fieldsEl.innerHTML = annotations.map(ann => {
+                const lineCount = ann.text.split('\n').length;
+                const hasNewlines = lineCount > 1;
+                return `
+                <div class="space-y-1.5 bg-slate-50 rounded-lg p-2">
+                    <div class="text-xs text-slate-500">
+                        <span class="font-medium">Original${hasNewlines ? ` (${lineCount} lines)` : ''}:</span>
+                        <div class="mt-1 text-slate-700 bg-white rounded p-1.5 border border-slate-200">${formatTextWithNewlines(ann.text)}</div>
+                    </div>
+                    <textarea
+                        data-text-id="${ann.id}"
+                        placeholder="Enter translation (use Shift+Enter for new lines)..."
+                        rows="${Math.max(lineCount, 2)}"
+                        class="w-full text-sm border border-slate-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary resize-y"
+                    >${escapeHtml(existingTranslations[ann.id] || '')}</textarea>
+                </div>
+            `}).join('');
+
+            document.getElementById('translation-editor').classList.remove('hidden');
+        };
+
+        window.cancelTranslation = () => {
+            currentTranslationLang = null;
+            document.getElementById('translation-editor').classList.add('hidden');
+        };
+
+        window.saveTranslation = () => {
+            if (!currentTranslationLang) return;
+
+            const translations = {};
+            document.querySelectorAll('#translation-fields textarea').forEach(textarea => {
+                const textId = textarea.dataset.textId;
+                const value = textarea.value.trim();
+                if (value) {
+                    translations[textId] = value;
+                }
+            });
+
+            if (Object.keys(translations).length === 0) {
+                alert('Please enter at least one translation.');
+                return;
+            }
+
+            editor.setTranslations(currentTranslationLang, translations);
+            document.getElementById('translation-editor').classList.add('hidden');
+            currentTranslationLang = null;
+
+            updateSavedTranslationsList();
+            updateExportButtons();
+        };
+
+        window.updateSavedTranslationsList = () => {
+            const langs = editor.getAvailableTranslations();
+            const listEl = document.getElementById('saved-translations');
+
+            if (langs.length === 0) {
+                listEl.innerHTML = '<p class="text-xs text-slate-400 italic">No translations saved yet.</p>';
+                return;
+            }
+
+            listEl.innerHTML = langs.map(lang => {
+                const translations = editor.getTranslations(lang);
+                const count = Object.keys(translations).length;
+                return `
+                    <div class="flex items-center justify-between bg-slate-50 rounded-lg p-2">
+                        <div>
+                            <span class="text-sm font-medium text-slate-700">${lang.toUpperCase()}</span>
+                            <span class="text-xs text-slate-400 ml-2">${count} translation${count !== 1 ? 's' : ''}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="editTranslation('${lang}')" class="text-xs text-primary hover:text-primary/80">Edit</button>
+                            <button onclick="deleteTranslation('${lang}')" class="text-xs text-red-500 hover:text-red-600">Delete</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        };
+
+        window.editTranslation = (langCode) => {
+            const select = document.getElementById('lang-code-select');
+            const customInput = document.getElementById('lang-code-custom');
+
+            // Check if langCode exists in dropdown options
+            const optionExists = Array.from(select.options).some(opt => opt.value === langCode);
+
+            if (optionExists) {
+                select.value = langCode;
+                customInput.classList.add('hidden');
+            } else {
+                // Use custom input for languages not in the list
+                select.value = 'custom';
+                customInput.value = langCode;
+                customInput.classList.remove('hidden');
+            }
+
+            startTranslation();
+        };
+
+        window.deleteTranslation = (langCode) => {
+            if (confirm(`Delete translations for ${langCode.toUpperCase()}?`)) {
+                editor.clearTranslations(langCode);
+                updateSavedTranslationsList();
+                updateExportButtons();
+            }
+        };
+
+        window.updateExportButtons = () => {
+            const langs = editor.getAvailableTranslations();
+            const container = document.getElementById('export-buttons');
+
+            // Keep original button, add translation buttons
+            let html = `
+                <button onclick="downloadImage()" class="w-full py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                    </svg>
+                    Download Original
+                </button>
+            `;
+
+            langs.forEach(lang => {
+                html += `
+                    <button onclick="downloadTranslated('${lang}')" class="w-full py-2 text-sm bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/>
+                        </svg>
+                        Download ${lang.toUpperCase()}
+                    </button>
+                `;
+            });
+
+            container.innerHTML = html;
+        };
+
+        window.downloadTranslated = (langCode) => {
+            const dataUrl = editor.exportWithTranslations(langCode);
+            if (!dataUrl) {
+                alert('Translation not available for ' + langCode);
+                return;
+            }
+            const link = document.createElement('a');
+            link.download = `image_${langCode}.png`;
             link.href = dataUrl;
             link.click();
         };
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); editor.undo(); }
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); editor.redo(); }
+            if ((e.ctrlKey || e.metaKey) && e.key === '0') { e.preventDefault(); editor.zoomToFit(); }
+            if ((e.ctrlKey || e.metaKey) && e.key === '1') { e.preventDefault(); editor.resetZoom(); }
+            if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+')) { e.preventDefault(); editor.zoomIn(); }
+            if ((e.ctrlKey || e.metaKey) && e.key === '-') { e.preventDefault(); editor.zoomOut(); }
+        });
+
+        // Refresh text annotations periodically when drawing
+        let lastObjectCount = 0;
+        setInterval(() => {
+            const currentCount = editor.state.objects.filter(o => o.type === 'text').length;
+            if (currentCount !== lastObjectCount) {
+                lastObjectCount = currentCount;
+                refreshTextAnnotations();
+            }
+        }, 500);
     </script>
 </body>
 </html>
